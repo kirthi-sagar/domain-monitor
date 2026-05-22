@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-export default function SignupPage() {
+export default async function SignupPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-md">
@@ -30,6 +31,7 @@ export default function SignupPage() {
                 <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
                 <p className="text-xs text-muted-foreground">At least 8 characters.</p>
               </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full">Create account</Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">

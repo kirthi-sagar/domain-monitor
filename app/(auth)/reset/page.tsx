@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-export default function ResetPage() {
+export default async function ResetPage({ searchParams }: { searchParams: Promise<{ sent?: string; error?: string }> }) {
+  const { sent, error } = await searchParams;
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-md">
@@ -21,6 +22,8 @@ export default function ResetPage() {
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" name="email" type="email" required />
               </div>
+              {sent && <p className="text-sm text-emerald-700">Reset link sent. Check your inbox.</p>}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full">Send reset link</Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
