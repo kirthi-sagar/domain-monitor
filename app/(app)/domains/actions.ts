@@ -32,6 +32,7 @@ export async function addDomainAction(formData: FormData): Promise<void> {
     added_by: user!.id,
     name: parsed.data.name,
     notes: parsed.data.notes ?? null,
+    monitor_flags: ["expiry", "whois", "nameservers", "registrar", "status", "dns"],
   }).select("id").single();
   if (error || !data) redirect(`/domains/new?error=${encodeURIComponent(error?.message ?? "insert failed")}`);
 

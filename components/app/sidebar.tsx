@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield } from "lucide-react";
+import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield, Filter } from "lucide-react";
 
 const items = [
   { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard" },
   { href: "/domains",       icon: Globe2,          label: "Domains" },
   { href: "/import",        icon: Upload,          label: "Import" },
   { href: "/channels",      icon: Radio,           label: "Channels" },
+  { href: "/alerts",        icon: Filter,          label: "Alert rules" },
   { href: "/notifications", icon: Bell,            label: "Notifications" },
   { href: "/team",          icon: Users,           label: "Team" },
   { href: "/api-keys",      icon: KeyRound,        label: "API keys" },

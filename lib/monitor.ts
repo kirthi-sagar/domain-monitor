@@ -1,7 +1,9 @@
 // Idempotent monitoring runner. Used by /api/domains/:id/check and cron.
 import { createServiceClient } from "@/lib/supabase/server";
 import { lookupDomain, type WhoisResult } from "@/lib/whois";
+import { resolveDns, diffDns, type DnsSnapshot } from "@/lib/dns";
 import { diffSnapshots, expiryThresholdEvents } from "@/lib/diff";
+import { dispatchAlertsForEvent } from "@/lib/alerts";
 import { daysUntil } from "@/lib/utils";
 
 interface CheckOpts { force?: boolean }
@@ -11,7 +13,11 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
   const { data: domain, error } = await supa.from("domains").select("*").eq("id", domainId).single();
   if (error || !domain) throw new Error(`Domain ${domainId} not found`);
 
-  const result = await lookupDomain(domain.name);
+  const wantsDns = (domain.monitor_flags ?? []).includes("dns");
+  const [result, dnsNext] = await Promise.all([
+    lookupDomain(domain.name),
+    wantsDns ? resolveDns(domain.name) : Promise.resolve(null as DnsSnapshot | null),
+  ]);
 
   // Find previous snapshot to diff against.
   const { data: prevSnap } = await supa
@@ -30,6 +36,7 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
         status: prevSnap.status ?? [],
       }
     : null;
+  const prevDns: DnsSnapshot | null = prevSnap?.dns_records ?? null;
 
   // Persist new snapshot.
   await supa.from("domain_snapshots").insert({
@@ -37,16 +44,20 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
     workspace_id: domain.workspace_id,
     whois_raw: result.raw,
     whois_parsed: result as any,
+    dns_records: dnsNext as any,
     nameservers: result.nameservers,
     registrar: result.registrar,
     expiration_date: result.expirationDate,
     status: result.status,
   });
 
-  // Compute structural diff events.
-  const changes = diffSnapshots(prev, result);
+  // Compute structural diff events (WHOIS + DNS).
+  const changes = [
+    ...diffSnapshots(prev, result),
+    ...(wantsDns && dnsNext ? diffDns(prevDns, dnsNext) : []),
+  ];
   for (const c of changes) {
-    await supa.from("domain_events").upsert({
+    const { data: inserted } = await supa.from("domain_events").upsert({
       domain_id: domainId,
       workspace_id: domain.workspace_id,
       kind: c.kind,
@@ -56,7 +67,20 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
       before: c.before as any,
       after: c.after as any,
       dedupe_key: c.dedupeKey,
-    }, { onConflict: "domain_id,kind,dedupe_key", ignoreDuplicates: true });
+    }, { onConflict: "domain_id,kind,dedupe_key", ignoreDuplicates: true }).select("id").maybeSingle();
+
+    // Only dispatch when upsert actually inserted a new row (idempotency).
+    if (inserted?.id) {
+      await dispatchAlertsForEvent({
+        workspaceId: domain.workspace_id,
+        eventId: inserted.id,
+        kind: c.kind,
+        title: c.title,
+        body: `Detected on ${domain.name}.\nBefore: ${JSON.stringify(c.before)}\nAfter:  ${JSON.stringify(c.after)}`,
+        severity: c.severity,
+        domainName: domain.name,
+      });
+    }
   }
 
   // Expiry threshold crossings.
@@ -64,16 +88,30 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
   const nextDays = daysUntil(result.expirationDate);
   const crossings = expiryThresholdEvents(prevDays, nextDays, domain.alert_thresholds ?? []);
   for (const t of crossings) {
-    await supa.from("domain_events").upsert({
+    const severity: "critical" | "warning" | "info" = t <= 7 ? "critical" : t <= 30 ? "warning" : "info";
+    const title = `Expires in ${t} day${t === 1 ? "" : "s"}`;
+    const { data: inserted } = await supa.from("domain_events").upsert({
       domain_id: domainId,
       workspace_id: domain.workspace_id,
       kind: "expiry",
-      severity: t <= 7 ? "critical" : t <= 30 ? "warning" : "info",
-      title: `Expires in ${t} day${t === 1 ? "" : "s"}`,
+      severity,
+      title,
       message: `Crossed ${t}-day reminder threshold for ${domain.name}.`,
       after: { days: t, expirationDate: result.expirationDate } as any,
       dedupe_key: `expt:${result.expirationDate}:${t}`,
-    }, { onConflict: "domain_id,kind,dedupe_key", ignoreDuplicates: true });
+    }, { onConflict: "domain_id,kind,dedupe_key", ignoreDuplicates: true }).select("id").maybeSingle();
+
+    if (inserted?.id) {
+      await dispatchAlertsForEvent({
+        workspaceId: domain.workspace_id,
+        eventId: inserted.id,
+        kind: "expiry",
+        title,
+        body: `${domain.name} expires in ${t} day${t === 1 ? "" : "s"} (${result.expirationDate}).`,
+        severity,
+        domainName: domain.name,
+      });
+    }
   }
 
   // Update domain summary fields.
