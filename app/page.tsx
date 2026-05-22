@@ -18,7 +18,6 @@ export default function HomePage() {
         <Features />
         <HowItWorks />
         <Channels />
-        <Testimonials />
         <FAQ />
         <CTA />
       </main>
@@ -32,12 +31,8 @@ function Hero() {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-grid pointer-events-none" />
-      <div className="relative mx-auto max-w-6xl px-6 pt-24 pb-20 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground shadow-xs">
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          Now monitoring 1M+ domains
-        </div>
-        <h1 className="mt-6 text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
+      <div className="relative mx-auto max-w-6xl px-6 pt-28 pb-20 text-center">
+        <h1 className="text-4xl sm:text-6xl font-semibold tracking-tight leading-[1.05]">
           Don&apos;t lose another <span className="text-primary">domain</span>.
           <br className="hidden sm:block" />
           Watch every change. Never miss a renewal.
@@ -60,12 +55,6 @@ function Hero() {
           <span className="text-muted-foreground">curl -X POST https://api.sentinel.dev/v1/domains \</span>
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-xs uppercase tracking-wider text-muted-foreground">
-          <span>Trusted by</span>
-          {["Northwind", "Acme Co", "Globex", "Initech", "Hooli", "Stark"].map((b) => (
-            <span key={b} className="font-semibold text-foreground/70">{b}</span>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -215,30 +204,6 @@ function Channels() {
             <Icon className="h-4 w-4 text-primary" /> {label}
           </div>
         ))}
-      </div>
-    </section>
-  );
-}
-
-/* ---------------- Testimonials ---------------- */
-function Testimonials() {
-  const quotes = [
-    { q: "We almost lost our flagship domain to a forgotten renewal. Sentinel caught it 30 days out and again at 7. Saved the brand.", a: "VP Eng, Northwind" },
-    { q: "The nameserver alert pinged our oncall before any customer noticed. Worth every cent.", a: "SRE, Hooli" },
-    { q: "We replaced three brittle scripts and a calendar with one webhook. Done.", a: "CTO, Initech" },
-  ];
-  return (
-    <section className="border-t border-border bg-muted/40">
-      <div className="mx-auto max-w-6xl px-6 py-20">
-        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight text-center">Teams trust Sentinel with their most critical assets.</h2>
-        <div className="mt-10 grid md:grid-cols-3 gap-4">
-          {quotes.map((q) => (
-            <Card key={q.a} className="p-6">
-              <p className="text-sm leading-relaxed">&ldquo;{q.q}&rdquo;</p>
-              <p className="mt-4 text-xs uppercase tracking-wider text-muted-foreground">{q.a}</p>
-            </Card>
-          ))}
-        </div>
       </div>
     </section>
   );

@@ -10,32 +10,16 @@ export async function signupAction(formData: FormData): Promise<void> {
   const fullName = String(formData.get("full_name") ?? "").trim();
 
   const supabase = await createClient();
-  const { error, data } = await supabase.auth.signUp({
+  const { error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: { full_name: fullName } },
   });
   if (error) { redirect(`/signup?error=${encodeURIComponent(error.message)}`); }
 
-  // Auto-create a starter workspace if confirmed
-  if (data.user && data.session) {
-    const slug = `${(fullName || email.split("@")[0])
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .slice(0, 32) || "ws"}-${Math.random().toString(36).slice(2, 6)}`;
-    const { data: ws } = await supabase
-      .from("workspaces")
-      .insert({ name: `${fullName || "My"}'s workspace`, slug, owner_id: data.user.id })
-      .select()
-      .single();
-    if (ws) {
-      await supabase.from("workspace_members").insert({
-        workspace_id: ws.id, user_id: data.user.id, role: "owner",
-      });
-      await supabase.from("profiles").update({ default_workspace_id: ws.id }).eq("id", data.user.id);
-    }
-  }
-
+  // Workspace provisioning happens lazily on first authenticated app load
+  // (see getCurrentWorkspaceId → ensureWorkspaceForUser). This is required
+  // because email-confirmation flows don't return a session here.
   revalidatePath("/", "layout");
   redirect("/dashboard");
 }
