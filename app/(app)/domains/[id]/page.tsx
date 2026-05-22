@@ -5,9 +5,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { ArrowLeft, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Trash2 } from "lucide-react";
 import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
 import { checkNowAction, deleteDomainAction } from "../actions";
+import { TestButton } from "@/components/app/test-button";
 import type { DomainRow, DomainEventRow } from "@/lib/supabase/types";
 
 export default async function DomainDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -43,10 +44,8 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
           <h1 className="text-2xl font-semibold tracking-tight truncate">{d.name}</h1>
           <p className="text-sm text-muted-foreground">{d.registrar ?? "Registrar unknown"} · last checked {d.last_checked_at ? formatDate(d.last_checked_at, { dateStyle: "medium", timeStyle: "short" }) : "—"}</p>
         </div>
-        <div className="flex gap-2 shrink-0">
-          <form action={checkNowAction.bind(null, d.id)}>
-            <Button type="submit" variant="outline" size="sm"><RefreshCw className="h-4 w-4" /> Check now</Button>
-          </form>
+        <div className="flex gap-2 shrink-0 items-center">
+          <TestButton action={checkNowAction.bind(null, d.id)} label="Check now" pendingLabel="Checking…" successLabel={`Re-checked ${d.name}`} />
           <form action={deleteDomainAction.bind(null, d.id)}>
             <Button type="submit" variant="ghost" size="sm" className="text-destructive hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
           </form>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Plus } from "lucide-react";
 import { toggleRuleAction, deleteRuleAction, testRuleAction } from "./actions";
+import { TestButton } from "@/components/app/test-button";
 
 export default async function AlertsPage() {
   const supabase = await createClient();
@@ -50,9 +51,9 @@ export default async function AlertsPage() {
                     </form>
                   </TD>
                   <TD className="text-right">
-                    <form action={testRuleAction.bind(null, r.id)} className="inline mr-1">
-                      <Button type="submit" size="sm" variant="outline">Test</Button>
-                    </form>
+                    <span className="inline-block mr-1">
+                      <TestButton action={testRuleAction.bind(null, r.id)} successLabel="Test event dispatched" />
+                    </span>
                     <form action={deleteRuleAction.bind(null, r.id)} className="inline">
                       <Button type="submit" size="sm" variant="ghost" className="text-destructive">Delete</Button>
                     </form>

@@ -13,26 +13,45 @@ export interface WhoisResult {
   source: "rdap" | "whois" | "none";
 }
 
-const RDAP_BOOTSTRAP = "https://rdap.org/domain/";
+// Try multiple RDAP entry points before falling back to TCP WHOIS.
+// rdap.org boots into the authoritative registry; for TLDs whose authoritative
+// server is flaky (e.g. .blog → rdap.blog.fury.ca), we also try a couple of
+// well-known generic registry endpoints opportunistically.
+const RDAP_SOURCES = [
+  "https://rdap.org/domain/",
+  "https://rdap.identitydigital.services/rdap/domain/", // covers .blog/.live/.online/etc.
+  "https://rdap.publicinterestregistry.org/rdap/domain/", // .org
+  "https://rdap.nominet.uk/uk/domain/", // .uk family
+];
 
 export async function lookupDomain(name: string): Promise<WhoisResult> {
   const clean = name.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  try {
-    const r = await fetch(RDAP_BOOTSTRAP + clean, {
-      redirect: "follow",
-      headers: { Accept: "application/rdap+json" },
-      // RDAP servers can be slow; cap at 15s.
-      signal: AbortSignal.timeout(15000),
-    });
-    if (r.ok) return parseRdap(await r.json(), clean);
-  } catch {
-    // Fall through to whois
+  console.log("[whois] looking up", clean);
+
+  for (const base of RDAP_SOURCES) {
+    try {
+      const r = await fetch(base + clean, {
+        redirect: "follow",
+        headers: { Accept: "application/rdap+json" },
+        signal: AbortSignal.timeout(8000),
+      });
+      console.log("[whois] rdap", base, "->", r.status);
+      if (r.ok) {
+        const parsed = parseRdap(await r.json(), clean);
+        console.log("[whois] parsed:", { registrar: parsed.registrar, expiry: parsed.expirationDate });
+        return parsed;
+      }
+    } catch (e) {
+      console.warn("[whois] rdap", base, "threw:", (e as Error).message);
+    }
   }
 
   try {
+    console.log("[whois] falling back to TCP/43");
     const raw = await whoisTcp(clean);
     return { ...parseWhoisRaw(raw), raw, source: "whois" };
-  } catch {
+  } catch (e) {
+    console.error("[whois] tcp/43 threw:", (e as Error).message);
     return emptyResult();
   }
 }

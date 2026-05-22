@@ -67,20 +67,30 @@ export async function deleteRuleAction(id: string): Promise<void> {
   redirect("/alerts");
 }
 
-export async function testRuleAction(id: string): Promise<void> {
+export async function testRuleAction(id: string): Promise<{ ok: boolean; message: string }> {
+  console.log("[testRuleAction] start for", id);
   const wsId = await getCurrentWorkspaceId();
-  if (!wsId) return;
+  if (!wsId) return { ok: false, message: "No workspace" };
   const supabase = await createClient();
   const { data: rule } = await supabase.from("alert_rules").select("*").eq("id", id).maybeSingle();
-  if (!rule) return;
+  if (!rule) return { ok: false, message: "Rule not found" };
 
-  await dispatchAlertsForEvent({
-    workspaceId: wsId,
-    eventId: `test-rule-${id}`,
-    title: `[TEST] Rule "${rule.name}" fired`,
-    body: "This is a test event generated from the Alerts page. If you received this, your rule is wired up correctly.",
-    severity: "info",
-    domainName: "test.example.com",
-  });
-  revalidatePath("/notifications");
+  try {
+    const r = await dispatchAlertsForEvent({
+      workspaceId: wsId,
+      eventId: `test-rule-${id}-${Date.now()}`,
+      kind: (rule.kinds ?? ["expiry"])[0],
+      title: `[TEST] Rule "${rule.name}" fired`,
+      body: "This is a test event generated from the Alerts page. If you received this, your rule is wired up correctly.",
+      severity: (rule.min_severity ?? "info") as any,
+      domainName: "test.example.com",
+    });
+    revalidatePath("/notifications");
+    if (r.dispatched === 0) {
+      return { ok: false, message: "No channels delivered. Check that the rule's channels are enabled and their config is valid." };
+    }
+    return { ok: true, message: `Dispatched to ${r.dispatched} channel${r.dispatched === 1 ? "" : "s"}` };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
 }

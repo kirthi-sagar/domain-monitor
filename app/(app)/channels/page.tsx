@@ -8,6 +8,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Plus, Mail, MessageSquare, Send, Webhook } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { toggleChannelAction, deleteChannelAction, testChannelAction } from "./actions";
+import { TestButton } from "@/components/app/test-button";
 
 const ICONS: Record<string, any> = { email: Mail, slack: MessageSquare, discord: MessageSquare, telegram: Send, webhook: Webhook };
 
@@ -61,9 +62,9 @@ export default async function ChannelsPage() {
                       ) : "Never"}
                     </TD>
                     <TD className="text-right">
-                      <form action={testChannelAction.bind(null, c.id)} className="inline mr-1">
-                        <Button type="submit" size="sm" variant="outline">Test</Button>
-                      </form>
+                      <span className="inline-block mr-1">
+                        <TestButton action={testChannelAction.bind(null, c.id)} successLabel={`Test sent to ${c.kind} channel`} />
+                      </span>
                       <form action={deleteChannelAction.bind(null, c.id)} className="inline">
                         <Button type="submit" size="sm" variant="ghost" className="text-destructive">Delete</Button>
                       </form>

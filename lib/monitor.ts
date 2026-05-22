@@ -38,18 +38,29 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
     : null;
   const prevDns: DnsSnapshot | null = prevSnap?.dns_records ?? null;
 
-  // Persist new snapshot.
-  await supa.from("domain_snapshots").insert({
-    domain_id: domainId,
-    workspace_id: domain.workspace_id,
-    whois_raw: result.raw,
-    whois_parsed: result as any,
-    dns_records: dnsNext as any,
-    nameservers: result.nameservers,
-    registrar: result.registrar,
-    expiration_date: result.expirationDate,
-    status: result.status,
-  });
+  // Decide whether this snapshot is worth storing.
+  // - Skip entirely if the lookup produced nothing (source === "none").
+  // - Skip if every field matches the previous snapshot (no signal worth keeping).
+  const sameAsPrev = prev
+    && prev.registrar === result.registrar
+    && prev.expirationDate === result.expirationDate
+    && (prev.nameservers ?? []).slice().sort().join(",") === result.nameservers.slice().sort().join(",")
+    && (prev.status ?? []).slice().sort().join(",") === result.status.slice().sort().join(",")
+    && (!wantsDns || JSON.stringify(prevSnap?.dns_records ?? null) === JSON.stringify(dnsNext ?? null));
+
+  if (result.source !== "none" && !sameAsPrev) {
+    await supa.from("domain_snapshots").insert({
+      domain_id: domainId,
+      workspace_id: domain.workspace_id,
+      whois_raw: result.raw,
+      whois_parsed: result as any,
+      dns_records: dnsNext as any,
+      nameservers: result.nameservers,
+      registrar: result.registrar,
+      expiration_date: result.expirationDate,
+      status: result.status,
+    });
+  }
 
   // Compute structural diff events (WHOIS + DNS).
   const changes = [

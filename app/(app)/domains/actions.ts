@@ -49,8 +49,19 @@ export async function deleteDomainAction(id: string) {
   redirect("/domains");
 }
 
-export async function checkNowAction(id: string) {
-  await checkDomain(id, { force: true });
-  revalidatePath(`/domains/${id}`);
-  revalidatePath("/domains");
+export async function checkNowAction(id: string): Promise<{ ok: boolean; message: string }> {
+  console.log("[checkNowAction] starting for", id);
+  try {
+    const r = await checkDomain(id, { force: true });
+    console.log("[checkNowAction] result:", r);
+    revalidatePath(`/domains/${id}`);
+    revalidatePath("/domains");
+    if (r.source === "none") {
+      return { ok: false, message: "Couldn't reach WHOIS/RDAP for this domain. The authoritative registry may be down or this environment can't reach it." };
+    }
+    return { ok: true, message: `Updated via ${r.source}${r.changes ? ` — ${r.changes} change${r.changes === 1 ? "" : "s"}` : ""}` };
+  } catch (e) {
+    console.error("[checkNowAction] FAILED:", (e as Error).message);
+    return { ok: false, message: (e as Error).message };
+  }
 }

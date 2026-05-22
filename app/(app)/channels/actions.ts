@@ -56,15 +56,16 @@ export async function deleteChannelAction(id: string): Promise<void> {
   redirect("/channels");
 }
 
-export async function testChannelAction(id: string): Promise<void> {
+export async function testChannelAction(id: string): Promise<{ ok: boolean; message: string }> {
+  console.log("[testChannelAction] start for", id);
   const supabase = await createClient();
   const wsId = await getCurrentWorkspaceId();
-  if (!wsId) return;
+  if (!wsId) return { ok: false, message: "No workspace" };
 
   const { data: ch } = await supabase.from("notification_channels").select("*").eq("id", id).maybeSingle();
-  if (!ch) return;
+  if (!ch) return { ok: false, message: "Channel not found" };
 
-  // Send directly (bypasses rule matching).
+  console.log("[testChannelAction] sending to", ch.kind);
   try {
     const { sendToChannel } = await import("@/lib/alerts-internal");
     await sendToChannel(ch.kind, ch.config, {
@@ -75,13 +76,15 @@ export async function testChannelAction(id: string): Promise<void> {
     await supabase.from("notification_channels").update({
       last_test_at: new Date().toISOString(), last_test_ok: true,
     }).eq("id", id);
+    revalidatePath("/channels");
+    void dispatchAlertsForEvent;
+    return { ok: true, message: `Test sent to ${ch.kind} channel "${ch.name}"` };
   } catch (e) {
+    console.error("[testChannelAction] FAILED:", (e as Error).message);
     await supabase.from("notification_channels").update({
       last_test_at: new Date().toISOString(), last_test_ok: false,
     }).eq("id", id);
-    throw e;
+    revalidatePath("/channels");
+    return { ok: false, message: (e as Error).message };
   }
-  // Silence unused import warning if dispatch helper gets reorganized
-  void dispatchAlertsForEvent;
-  revalidatePath("/channels");
 }
