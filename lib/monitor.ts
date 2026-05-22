@@ -2,6 +2,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
 import { lookupDomain, type WhoisResult } from "@/lib/whois";
 import { resolveDns, diffDns, type DnsSnapshot } from "@/lib/dns";
+import { checkAvailability, diffAvailability, type AvailabilitySnapshot } from "@/lib/availability";
 import { diffSnapshots, expiryThresholdEvents } from "@/lib/diff";
 import { dispatchAlertsForEvent } from "@/lib/alerts";
 import { daysUntil } from "@/lib/utils";
@@ -14,9 +15,11 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
   if (error || !domain) throw new Error(`Domain ${domainId} not found`);
 
   const wantsDns = (domain.monitor_flags ?? []).includes("dns");
-  const [result, dnsNext] = await Promise.all([
+  const wantsAvail = (domain.monitor_flags ?? []).includes("availability");
+  const [result, dnsNext, availNext] = await Promise.all([
     lookupDomain(domain.name),
     wantsDns ? resolveDns(domain.name) : Promise.resolve(null as DnsSnapshot | null),
+    wantsAvail ? checkAvailability(domain.name) : Promise.resolve(null as AvailabilitySnapshot | null),
   ]);
 
   // Find previous snapshot to diff against.
@@ -37,6 +40,7 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
       }
     : null;
   const prevDns: DnsSnapshot | null = prevSnap?.dns_records ?? null;
+  const prevAvail: AvailabilitySnapshot | null = prevSnap?.availability ?? null;
 
   // Decide whether this snapshot is worth storing.
   // - Skip entirely if the lookup produced nothing (source === "none").
@@ -46,15 +50,18 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
     && prev.expirationDate === result.expirationDate
     && (prev.nameservers ?? []).slice().sort().join(",") === result.nameservers.slice().sort().join(",")
     && (prev.status ?? []).slice().sort().join(",") === result.status.slice().sort().join(",")
-    && (!wantsDns || JSON.stringify(prevSnap?.dns_records ?? null) === JSON.stringify(dnsNext ?? null));
+    && (!wantsDns || JSON.stringify(prevSnap?.dns_records ?? null) === JSON.stringify(dnsNext ?? null))
+    && (!wantsAvail || JSON.stringify(prevAvail ?? null) === JSON.stringify(availNext ?? null));
 
-  if (result.source !== "none" && !sameAsPrev) {
+  const haveAnyData = result.source !== "none" || (wantsDns && dnsNext) || (wantsAvail && availNext);
+  if (haveAnyData && !sameAsPrev) {
     await supa.from("domain_snapshots").insert({
       domain_id: domainId,
       workspace_id: domain.workspace_id,
       whois_raw: result.raw,
       whois_parsed: result as any,
       dns_records: dnsNext as any,
+      availability: availNext as any,
       nameservers: result.nameservers,
       registrar: result.registrar,
       expiration_date: result.expirationDate,
@@ -62,10 +69,11 @@ export async function checkDomain(domainId: string, _opts: CheckOpts = {}) {
     });
   }
 
-  // Compute structural diff events (WHOIS + DNS).
+  // Compute structural diff events (WHOIS + DNS + availability).
   const changes = [
     ...diffSnapshots(prev, result),
     ...(wantsDns && dnsNext ? diffDns(prevDns, dnsNext) : []),
+    ...(wantsAvail && availNext ? diffAvailability(prevAvail, availNext) : []),
   ];
   for (const c of changes) {
     const { data: inserted } = await supa.from("domain_events").upsert({

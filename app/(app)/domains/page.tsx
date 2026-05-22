@@ -6,7 +6,7 @@ import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Download } from "lucide-react";
 import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
 import type { DomainRow } from "@/lib/supabase/types";
 
@@ -33,7 +33,11 @@ export default async function DomainsPage({ searchParams }: { searchParams: Prom
           <h1 className="text-2xl font-semibold tracking-tight">Domains</h1>
           <p className="text-sm text-muted-foreground">{rows.length} tracked.</p>
         </div>
-        <Button asChild><Link href="/domains/new"><Plus className="h-4 w-4" /> Add domain</Link></Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline"><a href="/api/export/domains"><Download className="h-4 w-4" /> CSV</a></Button>
+          <Button asChild variant="outline"><a href="/api/export/report"><Download className="h-4 w-4" /> PDF</a></Button>
+          <Button asChild><Link href="/domains/new"><Plus className="h-4 w-4" /> Add domain</Link></Button>
+        </div>
       </div>
 
       <form className="flex gap-2">

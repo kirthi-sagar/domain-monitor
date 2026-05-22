@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceId } from "@/lib/workspace";
 import { checkDomain } from "@/lib/monitor";
+import { audit } from "@/lib/audit";
 
 const DOMAIN_RE = /^([a-z0-9-]+\.)+[a-z]{2,}$/i;
 
@@ -32,11 +33,12 @@ export async function addDomainAction(formData: FormData): Promise<void> {
     added_by: user!.id,
     name: parsed.data.name,
     notes: parsed.data.notes ?? null,
-    monitor_flags: ["expiry", "whois", "nameservers", "registrar", "status", "dns"],
+    monitor_flags: ["expiry", "whois", "nameservers", "registrar", "status", "dns", "availability"],
   }).select("id").single();
   if (error || !data) redirect(`/domains/new?error=${encodeURIComponent(error?.message ?? "insert failed")}`);
 
   checkDomain(data!.id).catch(() => {});
+  await audit("domain.added", { workspaceId: wsId, targetKind: "domain", targetId: data!.id, metadata: { name: parsed.data.name } });
   revalidatePath("/domains");
   revalidatePath("/dashboard");
   redirect(`/domains/${data!.id}`);
@@ -44,7 +46,9 @@ export async function addDomainAction(formData: FormData): Promise<void> {
 
 export async function deleteDomainAction(id: string) {
   const supabase = await createClient();
+  const { data: d } = await supabase.from("domains").select("workspace_id, name").eq("id", id).maybeSingle();
   await supabase.from("domains").delete().eq("id", id);
+  await audit("domain.deleted", { workspaceId: d?.workspace_id, targetKind: "domain", targetId: id, metadata: { name: d?.name } });
   revalidatePath("/domains");
   redirect("/domains");
 }

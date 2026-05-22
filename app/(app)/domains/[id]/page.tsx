@@ -29,10 +29,13 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
 
   const { data: snapshots } = await supabase
     .from("domain_snapshots")
-    .select("id, taken_at, registrar, expiration_date, nameservers, status")
+    .select("id, taken_at, registrar, expiration_date, nameservers, status, availability")
     .eq("domain_id", id)
     .order("taken_at", { ascending: false })
     .limit(10);
+
+  const latestAvail = (snapshots?.[0] as any)?.availability as
+    { reachable: boolean; statusCode: number | null; tlsValidTo: string | null; tlsIssuer: string | null; latencyMs: number | null } | null;
 
   const [{ data: allTags }, { data: domainTags }] = await Promise.all([
     supabase.from("tags").select("id, name, color").eq("workspace_id", d.workspace_id).order("name"),
@@ -92,8 +95,23 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
         </Card>
       </div>
 
+      {latestAvail && (
+        <Card className="p-5">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Availability (last check)</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+            <div><div className="text-xs text-muted-foreground">Reachable</div><Badge variant={latestAvail.reachable ? "success" : "danger"} className="mt-1">{latestAvail.reachable ? "Yes" : "No"}</Badge></div>
+            <div><div className="text-xs text-muted-foreground">HTTP status</div><div className="mt-1 font-medium">{latestAvail.statusCode ?? "—"}</div></div>
+            <div><div className="text-xs text-muted-foreground">Latency</div><div className="mt-1 font-medium">{latestAvail.latencyMs ? `${latestAvail.latencyMs} ms` : "—"}</div></div>
+            <div><div className="text-xs text-muted-foreground">TLS expires</div><div className="mt-1 font-medium">{formatDate(latestAvail.tlsValidTo)}</div><div className="text-xs text-muted-foreground">{latestAvail.tlsIssuer ?? ""}</div></div>
+          </div>
+        </Card>
+      )}
+
       <Card>
-        <CardHeader><CardTitle>Activity timeline</CardTitle><CardDescription>Detected changes and reminders.</CardDescription></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div><CardTitle>Activity timeline</CardTitle><CardDescription>Detected changes and reminders.</CardDescription></div>
+          <Button asChild size="sm" variant="outline"><a href={`/api/export/events?domain_id=${d.id}`}>Export CSV</a></Button>
+        </CardHeader>
         <CardContent>
           {(!events || events.length === 0) ? (
             <div className="text-sm text-muted-foreground py-6 text-center">No events yet.</div>

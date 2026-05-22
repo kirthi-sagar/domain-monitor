@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield, Filter, Menu, X, Tag } from "lucide-react";
+import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield, Filter, Menu, X, Tag, FileClock } from "lucide-react";
 
 const items: { href: string; icon: any; label: string; adminOnly?: boolean }[] = [
   { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard" },
@@ -17,6 +17,7 @@ const items: { href: string; icon: any; label: string; adminOnly?: boolean }[] =
   { href: "/notifications", icon: Bell,            label: "Notifications" },
   { href: "/team",          icon: Users,           label: "Team" },
   { href: "/api-keys",      icon: KeyRound,        label: "API keys" },
+  { href: "/audit",         icon: FileClock,       label: "Audit log" },
   { href: "/settings",      icon: Settings,        label: "Settings" },
   { href: "/admin",         icon: Shield,          label: "Admin", adminOnly: true },
 ];

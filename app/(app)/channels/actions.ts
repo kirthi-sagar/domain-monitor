@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceId } from "@/lib/workspace";
 import { dispatchAlertsForEvent } from "@/lib/alerts";
+import { audit } from "@/lib/audit";
 
 const ChannelKind = z.enum(["email", "slack", "discord", "telegram", "webhook"]);
 
@@ -37,6 +38,7 @@ export async function createChannelAction(formData: FormData): Promise<void> {
   await supabase.from("notification_channels").insert({
     workspace_id: wsId, kind: kind.data, name, config: parsedCfg.data as object, enabled: true,
   });
+  await audit("channel.created", { workspaceId: wsId, targetKind: "channel", metadata: { kind: kind.data, name } });
 
   revalidatePath("/channels");
   revalidatePath("/settings");
@@ -51,7 +53,9 @@ export async function toggleChannelAction(id: string, enabled: boolean): Promise
 
 export async function deleteChannelAction(id: string): Promise<void> {
   const supabase = await createClient();
+  const { data: ch } = await supabase.from("notification_channels").select("workspace_id, kind, name").eq("id", id).maybeSingle();
   await supabase.from("notification_channels").delete().eq("id", id);
+  await audit("channel.deleted", { workspaceId: ch?.workspace_id, targetKind: "channel", targetId: id, metadata: { kind: ch?.kind, name: ch?.name } });
   revalidatePath("/channels");
   redirect("/channels");
 }
