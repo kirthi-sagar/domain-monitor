@@ -5,12 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield, Filter, Menu, X } from "lucide-react";
+import { LayoutDashboard, Globe2, Bell, Settings, KeyRound, Upload, Users, Radio, Shield, Filter, Menu, X, Tag } from "lucide-react";
 
 const items: { href: string; icon: any; label: string; adminOnly?: boolean }[] = [
   { href: "/dashboard",     icon: LayoutDashboard, label: "Dashboard" },
   { href: "/domains",       icon: Globe2,          label: "Domains" },
   { href: "/import",        icon: Upload,          label: "Import" },
+  { href: "/tags",          icon: Tag,             label: "Tags" },
   { href: "/channels",      icon: Radio,           label: "Channels" },
   { href: "/alerts",        icon: Filter,          label: "Alert rules" },
   { href: "/notifications", icon: Bell,            label: "Notifications" },

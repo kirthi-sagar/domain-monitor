@@ -10,20 +10,21 @@ import { Plus, Search } from "lucide-react";
 import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
 import type { DomainRow } from "@/lib/supabase/types";
 
-export default async function DomainsPage({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string }> }) {
-  const { q, filter } = await searchParams;
+export default async function DomainsPage({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; tag?: string }> }) {
+  const { q, filter, tag } = await searchParams;
   const supabase = await createClient();
   const wsId = await getCurrentWorkspaceId();
 
-  let query = supabase.from("domains").select("*").eq("workspace_id", wsId ?? "").is("archived_at", null).order("name");
+  let query = supabase.from("domains").select("*, domain_tags(tag_id)").eq("workspace_id", wsId ?? "").is("archived_at", null).order("name");
   if (q) query = query.ilike("name", `%${q}%`);
   const { data } = await query;
-  const rows = (data ?? []) as DomainRow[];
+  const rows = (data ?? []) as any[] as (DomainRow & { domain_tags?: { tag_id: string }[] })[];
 
-  const filtered = filter === "expiring" ? rows.filter((d) => {
-    const days = daysUntil(d.expiration_date);
-    return days !== null && days <= 30;
-  }) : rows;
+  const { data: allTags } = await supabase.from("tags").select("id, name, color").eq("workspace_id", wsId ?? "").order("name");
+
+  let filtered = rows;
+  if (filter === "expiring") filtered = filtered.filter((d) => { const days = daysUntil(d.expiration_date); return days !== null && days <= 30; });
+  if (tag) filtered = filtered.filter((d) => (d.domain_tags ?? []).some((t) => t.tag_id === tag));
 
   return (
     <div className="space-y-6">
@@ -40,10 +41,35 @@ export default async function DomainsPage({ searchParams }: { searchParams: Prom
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input name="q" defaultValue={q ?? ""} placeholder="Search domains…" className="pl-9" />
         </div>
+        {tag && <input type="hidden" name="tag" value={tag} />}
         <Button variant={filter === "expiring" ? "primary" : "outline"} asChild>
-          <Link href={filter === "expiring" ? "/domains" : "/domains?filter=expiring"}>Expiring</Link>
+          <Link href={filter === "expiring" ? `/domains${tag ? `?tag=${tag}` : ""}` : `/domains?filter=expiring${tag ? `&tag=${tag}` : ""}`}>Expiring</Link>
         </Button>
       </form>
+
+      {(allTags ?? []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Link href={`/domains${filter ? `?filter=${filter}` : ""}`}
+            className={`rounded-full border px-2.5 py-0.5 text-xs ${!tag ? "border-primary bg-accent text-accent-foreground" : "border-border bg-card text-muted-foreground hover:bg-muted"}`}>
+            All
+          </Link>
+          {(allTags ?? []).map((t: any) => {
+            const active = tag === t.id;
+            const href = active
+              ? `/domains${filter ? `?filter=${filter}` : ""}`
+              : `/domains?tag=${t.id}${filter ? `&filter=${filter}` : ""}`;
+            return (
+              <Link key={t.id} href={href}
+                className="rounded-full border px-2.5 py-0.5 text-xs"
+                style={active
+                  ? { borderColor: t.color, backgroundColor: t.color + "22", color: t.color }
+                  : { borderColor: "var(--border)" }}>
+                {t.name}
+              </Link>
+            );
+          })}
+        </div>
+      )}
 
       <Card className="p-0 overflow-hidden">
         {filtered.length === 0 ? (

@@ -9,6 +9,7 @@ import { ArrowLeft, Trash2 } from "lucide-react";
 import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
 import { checkNowAction, deleteDomainAction } from "../actions";
 import { TestButton } from "@/components/app/test-button";
+import { TagPicker } from "@/components/app/tag-picker";
 import type { DomainRow, DomainEventRow } from "@/lib/supabase/types";
 
 export default async function DomainDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +34,12 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
     .order("taken_at", { ascending: false })
     .limit(10);
 
+  const [{ data: allTags }, { data: domainTags }] = await Promise.all([
+    supabase.from("tags").select("id, name, color").eq("workspace_id", d.workspace_id).order("name"),
+    supabase.from("domain_tags").select("tag_id").eq("domain_id", id),
+  ]);
+  const selectedTagIds = (domainTags ?? []).map((r: any) => r.tag_id as string);
+
   const days = daysUntil(d.expiration_date);
   const sev = expirySeverity(days);
 
@@ -46,10 +53,15 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
         </div>
         <div className="flex gap-2 shrink-0 items-center">
           <TestButton action={checkNowAction.bind(null, d.id)} label="Check now" pendingLabel="Checking…" successLabel={`Re-checked ${d.name}`} />
+          <Button asChild variant="outline" size="sm"><Link href={`/domains/${d.id}/edit`}>Edit</Link></Button>
           <form action={deleteDomainAction.bind(null, d.id)}>
             <Button type="submit" variant="ghost" size="sm" className="text-destructive hover:bg-red-50"><Trash2 className="h-4 w-4" /></Button>
           </form>
         </div>
+      </div>
+
+      <div>
+        <TagPicker domainId={d.id} allTags={(allTags ?? []) as any} initialSelected={selectedTagIds} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -115,7 +127,7 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
               <TBody>
                 {snapshots.map((s: any) => (
                   <TR key={s.id}>
-                    <TD className="text-xs">{formatDate(s.taken_at, { dateStyle: "medium", timeStyle: "short" })}</TD>
+                    <TD className="text-xs"><Link href={`/domains/${d.id}/snapshots/${s.id}`} className="hover:underline">{formatDate(s.taken_at, { dateStyle: "medium", timeStyle: "short" })}</Link></TD>
                     <TD className="text-muted-foreground">{s.registrar ?? "—"}</TD>
                     <TD>{formatDate(s.expiration_date)}</TD>
                     <TD className="text-xs font-mono truncate max-w-xs">{(s.nameservers ?? []).join(", ") || "—"}</TD>

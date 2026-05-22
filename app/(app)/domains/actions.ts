@@ -49,6 +49,41 @@ export async function deleteDomainAction(id: string) {
   redirect("/domains");
 }
 
+const MONITOR_KINDS = ["expiry","whois","nameservers","registrar","status","dns","availability"] as const;
+
+const EditSchema = z.object({
+  notes: z.string().max(2000).optional(),
+  monitor_flags: z.array(z.enum(MONITOR_KINDS)).min(1, "Pick at least one monitor"),
+  alert_thresholds: z.array(z.coerce.number().int().min(0).max(365)).min(1).max(20),
+  check_interval_minutes: z.coerce.number().int().min(15).max(60 * 24 * 30).nullable().optional(),
+});
+
+export async function editDomainAction(id: string, formData: FormData): Promise<{ ok: boolean; message: string }> {
+  const thresholdsRaw = String(formData.get("alert_thresholds") ?? "")
+    .split(/[,\s]+/).filter(Boolean);
+  const intervalRaw = String(formData.get("check_interval_minutes") ?? "").trim();
+  const parsed = EditSchema.safeParse({
+    notes: String(formData.get("notes") ?? "").trim() || undefined,
+    monitor_flags: formData.getAll("monitor_flags"),
+    alert_thresholds: thresholdsRaw,
+    check_interval_minutes: intervalRaw === "" ? null : intervalRaw,
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("domains").update({
+    notes: parsed.data.notes ?? null,
+    monitor_flags: parsed.data.monitor_flags,
+    alert_thresholds: parsed.data.alert_thresholds,
+    check_interval_minutes: parsed.data.check_interval_minutes,
+  }).eq("id", id);
+  if (error) return { ok: false, message: error.message };
+
+  revalidatePath(`/domains/${id}`);
+  revalidatePath("/domains");
+  return { ok: true, message: "Settings saved" };
+}
+
 export async function checkNowAction(id: string): Promise<{ ok: boolean; message: string }> {
   console.log("[checkNowAction] starting for", id);
   try {
