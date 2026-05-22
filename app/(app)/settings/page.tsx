@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceId } from "@/lib/workspace";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Plus } from "lucide-react";
 
 export default async function SettingsPage() {
   const supabase = await createClient();
@@ -31,10 +33,23 @@ export default async function SettingsPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>Notification channels</CardTitle><CardDescription>Where alerts go.</CardDescription></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Notification channels</CardTitle>
+            <CardDescription>Where alerts go.</CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/channels">Manage channels →</Link>
+          </Button>
+        </CardHeader>
         <CardContent>
           {(!channels || channels.length === 0) ? (
-            <p className="text-sm text-muted-foreground">No channels yet. Add one via the API or contact support.</p>
+            <div className="rounded-lg border border-dashed border-border p-6 text-center">
+              <p className="text-sm text-muted-foreground">No channels yet.</p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href="/channels/new"><Plus className="h-4 w-4" /> Add channel</Link>
+              </Button>
+            </div>
           ) : (
             <ul className="divide-y divide-border">
               {channels.map((c: any) => (
@@ -45,7 +60,6 @@ export default async function SettingsPage() {
               ))}
             </ul>
           )}
-          <Button className="mt-4" variant="outline" disabled>Add channel (coming soon)</Button>
         </CardContent>
       </Card>
     </div>
