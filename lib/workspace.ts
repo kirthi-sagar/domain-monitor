@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { createClient, createServiceClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { getUser } from "@/lib/session";
 
 export const getCurrentWorkspaceId = cache(async (): Promise<string | null> => {
@@ -31,31 +31,19 @@ export const getCurrentWorkspaceId = cache(async (): Promise<string | null> => {
   return ensureWorkspaceForUser(user.id, profile?.full_name ?? null, profile?.email ?? user.email ?? "user");
 });
 
-async function ensureWorkspaceForUser(userId: string, fullName: string | null, email: string): Promise<string | null> {
-  // Uses the service-role client because the workspace_members RLS policy requires
-  // already being a member to insert — chicken-and-egg for first provisioning.
-  const svc = await createServiceClient();
+async function ensureWorkspaceForUser(_userId: string, fullName: string | null, email: string): Promise<string | null> {
+  // Delegates to a SECURITY DEFINER Postgres function that takes a row-level
+  // lock on the profile, so concurrent requests for the same user can never
+  // create duplicate workspaces.
+  const supabase = await createClient();
   const stem = (fullName || email.split("@")[0])
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .slice(0, 32) || "ws";
   const slug = `${stem}-${Math.random().toString(36).slice(2, 6)}`;
+  const name = `${fullName || "My"}'s workspace`;
 
-  const { data: ws, error } = await svc
-    .from("workspaces")
-    .insert({ name: `${fullName || "My"}'s workspace`, slug, owner_id: userId })
-    .select("id")
-    .single();
-  if (error || !ws) {
-    console.error("ensureWorkspaceForUser: workspace insert failed", error);
-    return null;
-  }
-
-  const { error: mErr } = await svc.from("workspace_members").insert({
-    workspace_id: ws.id, user_id: userId, role: "owner",
-  });
-  if (mErr) console.error("ensureWorkspaceForUser: member insert failed", mErr);
-
-  await svc.from("profiles").update({ default_workspace_id: ws.id }).eq("id", userId);
-  return ws.id as string;
+  const { data, error } = await supabase.rpc("ensure_default_workspace", { p_name: name, p_slug: slug });
+  if (error) { console.error("ensure_default_workspace failed:", error); return null; }
+  return (data as unknown as string) ?? null;
 }
