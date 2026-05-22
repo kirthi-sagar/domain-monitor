@@ -10,6 +10,7 @@ import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
 import { checkNowAction, deleteDomainAction } from "../actions";
 import { TestButton } from "@/components/app/test-button";
 import { TagPicker } from "@/components/app/tag-picker";
+import { MuteControl } from "@/components/app/mute-control";
 import type { DomainRow, DomainEventRow } from "@/lib/supabase/types";
 
 export default async function DomainDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -63,8 +64,9 @@ export default async function DomainDetail({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <TagPicker domainId={d.id} allTags={(allTags ?? []) as any} initialSelected={selectedTagIds} />
+        <MuteControl domainId={d.id} mutedUntil={d.alerts_muted_until} />
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

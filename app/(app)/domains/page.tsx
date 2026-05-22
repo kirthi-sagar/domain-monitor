@@ -2,12 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentWorkspaceId } from "@/lib/workspace";
 import { Card } from "@/components/ui/card";
-import { Table, THead, TBody, TR, TH, TD } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Download } from "lucide-react";
-import { daysUntil, expirySeverity, formatDate } from "@/lib/utils";
+import { daysUntil } from "@/lib/utils";
+import { DomainsTable } from "@/components/app/domains-table";
 import type { DomainRow } from "@/lib/supabase/types";
 
 export default async function DomainsPage({ searchParams }: { searchParams: Promise<{ q?: string; filter?: string; tag?: string }> }) {
@@ -75,45 +74,17 @@ export default async function DomainsPage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      <Card className="p-0 overflow-hidden">
-        {filtered.length === 0 ? (
-          <div className="p-16 text-center">
-            <div className="text-sm text-muted-foreground">No domains yet.</div>
-            <Button asChild className="mt-4"><Link href="/domains/new"><Plus className="h-4 w-4" /> Add your first domain</Link></Button>
-          </div>
-        ) : (
-          <Table>
-            <THead>
-              <TR>
-                <TH>Domain</TH>
-                <TH>Registrar</TH>
-                <TH>Expires</TH>
-                <TH>Last checked</TH>
-                <TH>Status</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {filtered.map((d) => {
-                const days = daysUntil(d.expiration_date);
-                const sev = expirySeverity(days);
-                return (
-                  <TR key={d.id}>
-                    <TD className="font-medium"><Link href={`/domains/${d.id}`} className="hover:underline">{d.name}</Link></TD>
-                    <TD className="text-muted-foreground">{d.registrar ?? "—"}</TD>
-                    <TD>{formatDate(d.expiration_date)} {days !== null && <span className="text-muted-foreground text-xs">({days}d)</span>}</TD>
-                    <TD className="text-muted-foreground text-xs">{d.last_checked_at ? formatDate(d.last_checked_at, { dateStyle: "medium", timeStyle: "short" }) : "Pending"}</TD>
-                    <TD>
-                      <Badge variant={sev === "crit" || sev === "expired" ? "danger" : sev === "warn" ? "warning" : sev === "unknown" ? "neutral" : "success"}>
-                        {sev === "expired" ? "Expired" : sev === "crit" ? "Critical" : sev === "warn" ? "Warning" : sev === "unknown" ? "Unknown" : "OK"}
-                      </Badge>
-                    </TD>
-                  </TR>
-                );
-              })}
-            </TBody>
-          </Table>
-        )}
-      </Card>
+      {filtered.length === 0 ? (
+        <Card className="p-16 text-center">
+          <div className="text-sm text-muted-foreground">No domains yet.</div>
+          <Button asChild className="mt-4"><Link href="/domains/new"><Plus className="h-4 w-4" /> Add your first domain</Link></Button>
+        </Card>
+      ) : (
+        <DomainsTable
+          rows={filtered.map((d) => ({ id: d.id, name: d.name, registrar: d.registrar, expiration_date: d.expiration_date, last_checked_at: d.last_checked_at }))}
+          tags={(allTags ?? []) as any}
+        />
+      )}
     </div>
   );
 }

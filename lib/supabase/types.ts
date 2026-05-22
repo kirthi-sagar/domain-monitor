@@ -29,6 +29,7 @@ export interface DomainRow {
   next_check_at: string | null;
   last_change_summary: string | null;
   archived_at: string | null;
+  alerts_muted_until: string | null;
   created_at: string;
   updated_at: string;
 }

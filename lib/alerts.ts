@@ -13,6 +13,16 @@ export interface DispatchInput extends SendInput {
 export async function dispatchAlertsForEvent(input: DispatchInput) {
   const supa = await createServiceClient();
 
+  // Honor per-domain mute window: if the event references a specific domain
+  // and that domain has alerts_muted_until in the future, suppress entirely.
+  if (input.domainName) {
+    const { data: d } = await supa.from("domains")
+      .select("alerts_muted_until").eq("workspace_id", input.workspaceId).eq("name", input.domainName).maybeSingle();
+    if (d?.alerts_muted_until && new Date(d.alerts_muted_until) > new Date()) {
+      return { dispatched: 0, muted: true };
+    }
+  }
+
   const { data: rules } = await supa.from("alert_rules")
     .select("*").eq("workspace_id", input.workspaceId).eq("enabled", true);
 

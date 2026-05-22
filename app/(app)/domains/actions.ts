@@ -88,6 +88,53 @@ export async function editDomainAction(id: string, formData: FormData): Promise<
   return { ok: true, message: "Settings saved" };
 }
 
+export async function bulkDomainsAction(
+  ids: string[],
+  op: "recheck" | "archive" | "delete"
+): Promise<{ ok: boolean; message: string }> {
+  if (ids.length === 0) return { ok: false, message: "No domains selected" };
+  const supabase = await createClient();
+
+  if (op === "delete") {
+    const { error } = await supabase.from("domains").delete().in("id", ids);
+    if (error) return { ok: false, message: error.message };
+    revalidatePath("/domains");
+    return { ok: true, message: `Deleted ${ids.length} domain${ids.length === 1 ? "" : "s"}` };
+  }
+  if (op === "archive") {
+    const { error } = await supabase.from("domains").update({ archived_at: new Date().toISOString() }).in("id", ids);
+    if (error) return { ok: false, message: error.message };
+    revalidatePath("/domains");
+    return { ok: true, message: `Archived ${ids.length} domain${ids.length === 1 ? "" : "s"}` };
+  }
+  if (op === "recheck") {
+    for (const id of ids) checkDomain(id, { force: true }).catch(() => {});
+    return { ok: true, message: `Re-checking ${ids.length} domain${ids.length === 1 ? "" : "s"} in the background` };
+  }
+  return { ok: false, message: "Unknown op" };
+}
+
+export async function muteDomainAction(id: string, hours: number | null): Promise<{ ok: boolean; message: string }> {
+  const supabase = await createClient();
+  const until = hours === null ? null : new Date(Date.now() + hours * 3_600_000).toISOString();
+  const { error } = await supabase.from("domains").update({ alerts_muted_until: until }).eq("id", id);
+  if (error) return { ok: false, message: error.message };
+  revalidatePath(`/domains/${id}`);
+  revalidatePath("/domains");
+  return { ok: true, message: until ? `Alerts muted until ${new Date(until).toLocaleString()}` : "Alerts un-muted" };
+}
+
+export async function bulkTagDomainsAction(ids: string[], tagIds: string[]): Promise<{ ok: boolean; message: string }> {
+  if (ids.length === 0) return { ok: false, message: "No domains selected" };
+  if (tagIds.length === 0) return { ok: false, message: "Pick at least one tag" };
+  const supabase = await createClient();
+  const rows = ids.flatMap((d) => tagIds.map((t) => ({ domain_id: d, tag_id: t })));
+  const { error } = await supabase.from("domain_tags").upsert(rows, { ignoreDuplicates: true });
+  if (error) return { ok: false, message: error.message };
+  revalidatePath("/domains");
+  return { ok: true, message: `Tagged ${ids.length} domain${ids.length === 1 ? "" : "s"}` };
+}
+
 export async function checkNowAction(id: string): Promise<{ ok: boolean; message: string }> {
   console.log("[checkNowAction] starting for", id);
   try {
